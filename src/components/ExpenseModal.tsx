@@ -14,11 +14,11 @@ export type ExpenseDraft = {
   helly_percentage?: number;
 };
 
-const CATEGORIES = ["General", "Groceries", "Rent", "Utilities", "Subscriptions", "Transport", "Dining", "Health", "Entertainment", "Other"];
+const FALLBACK_CATEGORIES = ["General"];
 
 export function ExpenseModal({
   open, onClose, onSave, initial, defaultMonth, hideRecurring = false, monthLabel: monthLabelText = "Month",
-  showSplit = false,
+  showSplit = false, categories, defaultChazyPct = 50, defaultHellyPct = 50,
 }: {
   open: boolean;
   onClose: () => void;
@@ -28,10 +28,14 @@ export function ExpenseModal({
   hideRecurring?: boolean;
   monthLabel?: string;
   showSplit?: boolean;
+  categories?: string[];
+  defaultChazyPct?: number;
+  defaultHellyPct?: number;
 }) {
+  const catList = categories && categories.length > 0 ? categories : FALLBACK_CATEGORIES;
   const [form, setForm] = useState<ExpenseDraft>({
-    name: "", amount: 0, expense_month: defaultMonth, notes: "", category: "General", recurring_type: "one_time",
-    chazy_percentage: 50, helly_percentage: 50,
+    name: "", amount: 0, expense_month: defaultMonth, notes: "", category: catList[0], recurring_type: "one_time",
+    chazy_percentage: defaultChazyPct, helly_percentage: defaultHellyPct,
   });
 
   useEffect(() => {
@@ -41,14 +45,14 @@ export function ExpenseModal({
         amount: initial?.amount ?? 0,
         expense_month: initial?.expense_month ?? defaultMonth,
         notes: initial?.notes ?? "",
-        category: initial?.category ?? "General",
+        category: initial?.category ?? catList[0],
         recurring_type: initial?.recurring_type ?? "one_time",
-        chazy_percentage: initial?.chazy_percentage ?? 50,
-        helly_percentage: initial?.helly_percentage ?? 50,
+        chazy_percentage: initial?.chazy_percentage ?? defaultChazyPct,
+        helly_percentage: initial?.helly_percentage ?? defaultHellyPct,
         id: initial?.id,
       });
     }
-  }, [open, initial, defaultMonth]);
+  }, [open, initial, defaultMonth, defaultChazyPct, defaultHellyPct]);
 
   const year = parseInt(form.expense_month.slice(0, 4), 10);
 
@@ -107,7 +111,10 @@ export function ExpenseModal({
             <label className="form-label small text-secondary">Category</label>
             <select className="form-select" value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+              {/* include current category even if no longer in user list, so editing old expenses doesn't lose it */}
+              {(catList.includes(form.category) ? catList : [form.category, ...catList]).map((c) => (
+                <option key={c}>{c}</option>
+              ))}
             </select>
           </div>
           {!hideRecurring && (
