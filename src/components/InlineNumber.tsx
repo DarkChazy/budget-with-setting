@@ -4,7 +4,7 @@ export function InlineNumber({
   value,
   onSave,
   className = "",
-  prefix = "$",
+  prefix = "€",
 }: {
   value: number;
   onSave: (n: number) => void;
