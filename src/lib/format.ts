@@ -1,7 +1,7 @@
 export const fmtMoney = (n: number | string) => {
   const v = typeof n === "string" ? parseFloat(n) : n;
-  if (isNaN(v)) return "$0.00";
-  return v.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+  if (isNaN(v)) return "€0.00";
+  return v.toLocaleString("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export const monthKey = (d: Date) => {

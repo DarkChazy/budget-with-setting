@@ -8,11 +8,15 @@ import { InlineNumber } from "@/components/InlineNumber";
 import { MonthSelector } from "@/components/MonthSelector";
 import { YearOverview, type MonthStat } from "@/components/YearOverview";
 import { MonthlyBarChart } from "@/components/MonthlyBarChart";
+import { useCategories, useUserSettings, defaultMonthFor } from "@/lib/settings";
 
 type AccountKind = "private" | "house";
 
 export function AccountPage({ accountType, title }: { accountType: AccountKind; title: string }) {
   const { user } = useCurrentUser();
+  const { settings } = useUserSettings(user?.id);
+  const { categories } = useCategories(user?.id);
+  const catNames = categories.map((c) => c.name);
   const [month, setMonth] = useState(currentMonth());
   const [year, setYear] = useState(new Date().getFullYear());
   const [accountAmount, setAccountAmount] = useState(0);
@@ -22,6 +26,13 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
   const [editing, setEditing] = useState<ExpenseDraft | undefined>();
   const showCC = accountType === "private";
   const isHouse = accountType === "house";
+
+  const monthOffset = isHouse
+    ? (settings?.default_house_month_offset ?? 0)
+    : (settings?.default_private_month_offset ?? 0);
+  const newExpenseDefaultMonth = defaultMonthFor(monthOffset);
+  const defaultChazy = parseFloat((settings?.chazy_default_percentage ?? 60) as any);
+  const defaultHelly = parseFloat((settings?.helly_default_percentage ?? 40) as any);
 
   const loadAccount = useCallback(async () => {
     if (!user) return;
@@ -263,8 +274,11 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
         onClose={() => setModalOpen(false)}
         onSave={saveExpense}
         initial={editing}
-        defaultMonth={month}
+        defaultMonth={editing ? month : newExpenseDefaultMonth}
         showSplit={isHouse}
+        categories={catNames}
+        defaultChazyPct={defaultChazy}
+        defaultHellyPct={defaultHelly}
       />
     </>
   );

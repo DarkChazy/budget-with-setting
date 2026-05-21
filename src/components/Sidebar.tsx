@@ -12,6 +12,7 @@ const NAV = [
   { to: "/private", label: "Private Account", icon: "bi-person" },
   { to: "/house", label: "House Account", icon: "bi-house" },
   { to: "/credit-card", label: "Credit Card", icon: "bi-credit-card-2-front" },
+  { to: "/settings", label: "Settings", icon: "bi-gear" },
 ];
 
 export function Sidebar() {
@@ -98,7 +99,7 @@ export function Sidebar() {
               value={parseFloat(s.amount as any)}
               onSave={(n) => updateAmt(s.id, n)}
               className="amount editable"
-              prefix="$"
+              prefix="€"
             />
             <button
               onClick={() => removeSavings(s.id)}
