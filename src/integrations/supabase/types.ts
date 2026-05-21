@@ -104,10 +104,12 @@ export type Database = {
           account_type: Database["public"]["Enums"]["account_type"]
           amount: number
           category: string | null
+          chazy_percentage: number
           created_at: string
           deleted_at: string | null
           expense_month: string
           generated_from_id: string | null
+          helly_percentage: number
           id: string
           is_paid: boolean
           name: string
@@ -120,10 +122,12 @@ export type Database = {
           account_type: Database["public"]["Enums"]["account_type"]
           amount?: number
           category?: string | null
+          chazy_percentage?: number
           created_at?: string
           deleted_at?: string | null
           expense_month: string
           generated_from_id?: string | null
+          helly_percentage?: number
           id?: string
           is_paid?: boolean
           name: string
@@ -136,10 +140,12 @@ export type Database = {
           account_type?: Database["public"]["Enums"]["account_type"]
           amount?: number
           category?: string | null
+          chazy_percentage?: number
           created_at?: string
           deleted_at?: string | null
           expense_month?: string
           generated_from_id?: string | null
+          helly_percentage?: number
           id?: string
           is_paid?: boolean
           name?: string

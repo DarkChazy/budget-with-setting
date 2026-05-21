@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/lib/auth";
-import { addMonths, currentMonth, fmtMoney, monthLabel, yearMonths } from "@/lib/format";
+import { currentMonth, fmtMoney, monthLabel, yearMonths } from "@/lib/format";
 import { ExpenseModal, type ExpenseDraft } from "@/components/ExpenseModal";
 import { ExpenseTable, type ExpenseRow } from "@/components/ExpenseTable";
 import { InlineNumber } from "@/components/InlineNumber";
@@ -21,6 +21,7 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ExpenseDraft | undefined>();
   const showCC = accountType === "private";
+  const isHouse = accountType === "house";
 
   const loadAccount = useCallback(async () => {
     if (!user) return;
@@ -78,6 +79,19 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
   const ccThisMonth = current?.ccBilled ?? 0;
   const unpaidThisMonth = current?.unpaidExpenses ?? 0;
 
+  const splitTotals = useMemo(() => {
+    let chazy = 0, helly = 0;
+    for (const e of monthExpenses) {
+      if (e.is_paid) continue;
+      const amt = parseFloat(e.amount as any);
+      const cz = parseFloat((e.chazy_percentage ?? 50) as any);
+      const he = parseFloat((e.helly_percentage ?? 50) as any);
+      chazy += (amt * cz) / 100;
+      helly += (amt * he) / 100;
+    }
+    return { chazy, helly };
+  }, [monthExpenses]);
+
   const saveAmount = async (n: number) => {
     if (!user) return;
     setAccountAmount(n);
@@ -97,16 +111,19 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
 
   const saveExpense = async (e: ExpenseDraft) => {
     if (!user) return;
+    const payload: any = {
+      name: e.name, amount: e.amount, expense_month: e.expense_month,
+      notes: e.notes, category: e.category, recurring_type: e.recurring_type,
+    };
+    if (isHouse) {
+      payload.chazy_percentage = e.chazy_percentage ?? 50;
+      payload.helly_percentage = e.helly_percentage ?? 50;
+    }
     if (e.id) {
-      await supabase.from("expenses").update({
-        name: e.name, amount: e.amount, expense_month: e.expense_month,
-        notes: e.notes, category: e.category, recurring_type: e.recurring_type,
-      }).eq("id", e.id);
+      await supabase.from("expenses").update(payload).eq("id", e.id);
     } else {
       await supabase.from("expenses").insert({
-        user_id: user.id, account_type: accountType,
-        name: e.name, amount: e.amount, expense_month: e.expense_month,
-        notes: e.notes, category: e.category, recurring_type: e.recurring_type,
+        user_id: user.id, account_type: accountType, ...payload,
       });
     }
     loadExpenses();
@@ -159,6 +176,7 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
         </div>
         <ExpenseTable
           rows={monthExpenses}
+          showSplit={isHouse}
           onTogglePaid={togglePaid}
           onEdit={(r) => {
             setEditing({
@@ -166,12 +184,33 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
               expense_month: r.expense_month!, notes: r.notes ?? "",
               category: r.category ?? "General",
               recurring_type: (r.recurring_type as any) ?? "one_time",
+              chazy_percentage: parseFloat((r.chazy_percentage ?? 50) as any),
+              helly_percentage: parseFloat((r.helly_percentage ?? 50) as any),
             });
             setModalOpen(true);
           }}
           onDelete={deleteExpense}
         />
       </div>
+
+      {isHouse && (
+        <div className="row g-3 mb-4">
+          <div className="col-md-6">
+            <div className="card-modern h-100" style={{ borderLeft: "3px solid #3b82f6" }}>
+              <div className="summary-label">Chazy owes · {monthLabel(month)}</div>
+              <div className="summary-amount" style={{ color: "#3b82f6" }}>{fmtMoney(splitTotals.chazy)}</div>
+              <div className="small" style={{ color: "var(--text-dim)" }}>Unpaid expenses only</div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card-modern h-100" style={{ borderLeft: "3px solid #10b981" }}>
+              <div className="summary-label">Helly owes · {monthLabel(month)}</div>
+              <div className="summary-amount" style={{ color: "#10b981" }}>{fmtMoney(splitTotals.helly)}</div>
+              <div className="small" style={{ color: "var(--text-dim)" }}>Unpaid expenses only</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card-modern mb-4">
         <div className="section-header">
@@ -198,7 +237,7 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
         />
       </div>
 
-      <div className={"row g-3 " + (showCC ? "" : "")}>
+      <div className="row g-3">
         <div className={showCC ? "col-lg-6" : "col-12"}>
           <div className="card-modern">
             <div className="section-header">
@@ -225,6 +264,7 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
         onSave={saveExpense}
         initial={editing}
         defaultMonth={month}
+        showSplit={isHouse}
       />
     </>
   );

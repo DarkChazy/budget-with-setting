@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "./Modal";
-import { monthLabel, yearMonths } from "@/lib/format";
+import { monthLabel, yearMonths, fmtMoney } from "@/lib/format";
 
 export type ExpenseDraft = {
   id?: string;
@@ -10,12 +10,15 @@ export type ExpenseDraft = {
   notes: string;
   category: string;
   recurring_type: "one_time" | "monthly" | "yearly";
+  chazy_percentage?: number;
+  helly_percentage?: number;
 };
 
 const CATEGORIES = ["General", "Groceries", "Rent", "Utilities", "Subscriptions", "Transport", "Dining", "Health", "Entertainment", "Other"];
 
 export function ExpenseModal({
   open, onClose, onSave, initial, defaultMonth, hideRecurring = false, monthLabel: monthLabelText = "Month",
+  showSplit = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -24,9 +27,11 @@ export function ExpenseModal({
   defaultMonth: string;
   hideRecurring?: boolean;
   monthLabel?: string;
+  showSplit?: boolean;
 }) {
   const [form, setForm] = useState<ExpenseDraft>({
     name: "", amount: 0, expense_month: defaultMonth, notes: "", category: "General", recurring_type: "one_time",
+    chazy_percentage: 50, helly_percentage: 50,
   });
 
   useEffect(() => {
@@ -38,6 +43,8 @@ export function ExpenseModal({
         notes: initial?.notes ?? "",
         category: initial?.category ?? "General",
         recurring_type: initial?.recurring_type ?? "one_time",
+        chazy_percentage: initial?.chazy_percentage ?? 50,
+        helly_percentage: initial?.helly_percentage ?? 50,
         id: initial?.id,
       });
     }
@@ -45,9 +52,33 @@ export function ExpenseModal({
 
   const year = parseInt(form.expense_month.slice(0, 4), 10);
 
+  const cz = form.chazy_percentage ?? 0;
+  const he = form.helly_percentage ?? 0;
+  const total = Math.round((cz + he) * 100) / 100;
+  const splitValid = !showSplit || total === 100;
+  const splitError = showSplit && total !== 100;
+
+  const chazyAmount = useMemo(() => (form.amount * cz) / 100, [form.amount, cz]);
+  const hellyAmount = useMemo(() => (form.amount * he) / 100, [form.amount, he]);
+
+  const setChazy = (n: number) => {
+    const v = isNaN(n) ? 0 : n;
+    setForm({ ...form, chazy_percentage: v, helly_percentage: Math.max(0, Math.round((100 - v) * 100) / 100) });
+  };
+  const setHelly = (n: number) => {
+    const v = isNaN(n) ? 0 : n;
+    setForm({ ...form, helly_percentage: v, chazy_percentage: Math.max(0, Math.round((100 - v) * 100) / 100) });
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={initial?.id ? "Edit expense" : "Add expense"}>
-      <form onSubmit={(e) => { e.preventDefault(); if (form.name.trim()) { onSave(form); onClose(); } }}>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        if (!form.name.trim()) return;
+        if (!splitValid) return;
+        onSave(form);
+        onClose();
+      }}>
         <div className="mb-3">
           <label className="form-label small text-secondary">Name</label>
           <input autoFocus className="form-control" value={form.name}
@@ -91,6 +122,52 @@ export function ExpenseModal({
             </div>
           )}
         </div>
+
+        {showSplit && (
+          <div className="mt-3 p-3 rounded" style={{ background: "var(--surface-2, rgba(255,255,255,.03))", border: "1px solid var(--border, rgba(255,255,255,.08))" }}>
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <label className="form-label small text-secondary mb-0">Split between Chazy & Helly</label>
+              <span className={"small fw-semibold " + (splitError ? "text-danger" : "text-success")}>
+                Total: {total}%
+              </span>
+            </div>
+            <div className="row g-3">
+              <div className="col-6">
+                <label className="form-label small text-secondary">Chazy %</label>
+                <div className="input-group">
+                  <input
+                    type="number" step="0.01" min="0" max="100"
+                    className={"form-control" + (splitError ? " is-invalid" : "")}
+                    value={cz}
+                    onChange={(e) => setChazy(parseFloat(e.target.value))}
+                  />
+                  <span className="input-group-text">%</span>
+                </div>
+                <div className="small mt-1" style={{ color: "var(--text-dim)" }}>{fmtMoney(chazyAmount)}</div>
+              </div>
+              <div className="col-6">
+                <label className="form-label small text-secondary">Helly %</label>
+                <div className="input-group">
+                  <input
+                    type="number" step="0.01" min="0" max="100"
+                    className={"form-control" + (splitError ? " is-invalid" : "")}
+                    value={he}
+                    onChange={(e) => setHelly(parseFloat(e.target.value))}
+                  />
+                  <span className="input-group-text">%</span>
+                </div>
+                <div className="small mt-1" style={{ color: "var(--text-dim)" }}>{fmtMoney(hellyAmount)}</div>
+              </div>
+            </div>
+            {splitError && (
+              <div className="text-danger small mt-2">
+                <i className="bi bi-exclamation-circle me-1" />
+                The combined percentage for Chazy and Helly must equal 100%.
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-3">
           <label className="form-label small text-secondary">Notes</label>
           <textarea className="form-control" rows={2} value={form.notes}
@@ -98,7 +175,7 @@ export function ExpenseModal({
         </div>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={!splitValid}>
             <i className="bi bi-check-lg me-1" /> Save
           </button>
         </div>
