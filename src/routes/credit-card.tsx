@@ -8,11 +8,13 @@ import { ExpenseModal, type ExpenseDraft } from "@/components/ExpenseModal";
 import { ExpenseTable, type ExpenseRow } from "@/components/ExpenseTable";
 import { MonthSelector } from "@/components/MonthSelector";
 import { MonthlyBarChart } from "@/components/MonthlyBarChart";
+import { useCategories } from "@/lib/settings";
 
 export const Route = createFileRoute("/credit-card")({ component: () => <AppLayout><CCPage /></AppLayout> });
 
 function CCPage() {
   const { user } = useCurrentUser();
+  const { categories } = useCategories(user?.id);
   const [month, setMonth] = useState(currentMonth());
   const [year, setYear] = useState(new Date().getFullYear());
   const [rows, setRows] = useState<ExpenseRow[]>([]);
@@ -121,6 +123,7 @@ function CCPage() {
         defaultMonth={month}
         hideRecurring
         monthLabel="Billing month"
+        categories={categories.map((c) => c.name)}
       />
     </>
   );
