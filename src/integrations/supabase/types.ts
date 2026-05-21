@@ -49,6 +49,30 @@ export type Database = {
           },
         ]
       }
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_card_expenses: {
         Row: {
           amount: number
@@ -205,6 +229,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_settings: {
+        Row: {
+          chazy_default_percentage: number
+          created_at: string
+          default_house_month_offset: number
+          default_private_month_offset: number
+          helly_default_percentage: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chazy_default_percentage?: number
+          created_at?: string
+          default_house_month_offset?: number
+          default_private_month_offset?: number
+          helly_default_percentage?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chazy_default_percentage?: number
+          created_at?: string
+          default_house_month_offset?: number
+          default_private_month_offset?: number
+          helly_default_percentage?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       users: {
         Row: {
