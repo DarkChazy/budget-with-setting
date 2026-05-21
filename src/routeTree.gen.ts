@@ -9,8 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PrivateRouteImport } from './routes/private'
+import { Route as HouseRouteImport } from './routes/house'
+import { Route as CreditCardRouteImport } from './routes/credit-card'
 import { Route as IndexRouteImport } from './routes/index'
 
+const PrivateRoute = PrivateRouteImport.update({
+  id: '/private',
+  path: '/private',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HouseRoute = HouseRouteImport.update({
+  id: '/house',
+  path: '/house',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreditCardRoute = CreditCardRouteImport.update({
+  id: '/credit-card',
+  path: '/credit-card',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +37,61 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/credit-card': typeof CreditCardRoute
+  '/house': typeof HouseRoute
+  '/private': typeof PrivateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/credit-card': typeof CreditCardRoute
+  '/house': typeof HouseRoute
+  '/private': typeof PrivateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/credit-card': typeof CreditCardRoute
+  '/house': typeof HouseRoute
+  '/private': typeof PrivateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/credit-card' | '/house' | '/private'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/credit-card' | '/house' | '/private'
+  id: '__root__' | '/' | '/credit-card' | '/house' | '/private'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CreditCardRoute: typeof CreditCardRoute
+  HouseRoute: typeof HouseRoute
+  PrivateRoute: typeof PrivateRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/private': {
+      id: '/private'
+      path: '/private'
+      fullPath: '/private'
+      preLoaderRoute: typeof PrivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/house': {
+      id: '/house'
+      path: '/house'
+      fullPath: '/house'
+      preLoaderRoute: typeof HouseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/credit-card': {
+      id: '/credit-card'
+      path: '/credit-card'
+      fullPath: '/credit-card'
+      preLoaderRoute: typeof CreditCardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,7 +104,20 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CreditCardRoute: CreditCardRoute,
+  HouseRoute: HouseRoute,
+  PrivateRoute: PrivateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
