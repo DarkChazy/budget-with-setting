@@ -14,7 +14,213 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          created_at: string
+          current_amount: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          created_at?: string
+          current_amount?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_type?: Database["public"]["Enums"]["account_type"]
+          created_at?: string
+          current_amount?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_card_expenses: {
+        Row: {
+          amount: number
+          billing_month: string
+          category: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_paid: boolean
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          billing_month: string
+          category?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_paid?: boolean
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_month?: string
+          category?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_paid?: boolean
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_card_expenses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          amount: number
+          category: string | null
+          created_at: string
+          deleted_at: string | null
+          expense_month: string
+          generated_from_id: string | null
+          id: string
+          is_paid: boolean
+          name: string
+          notes: string | null
+          recurring_type: Database["public"]["Enums"]["recurring_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          amount?: number
+          category?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          expense_month: string
+          generated_from_id?: string | null
+          id?: string
+          is_paid?: boolean
+          name: string
+          notes?: string | null
+          recurring_type?: Database["public"]["Enums"]["recurring_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_type?: Database["public"]["Enums"]["account_type"]
+          amount?: number
+          category?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          expense_month?: string
+          generated_from_id?: string | null
+          id?: string
+          is_paid?: boolean
+          name?: string
+          notes?: string | null
+          recurring_type?: Database["public"]["Enums"]["recurring_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_generated_from_id_fkey"
+            columns: ["generated_from_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      savings_accounts: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +229,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      account_type: "private" | "house"
+      recurring_type: "one_time" | "monthly" | "yearly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +357,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      account_type: ["private", "house"],
+      recurring_type: ["one_time", "monthly", "yearly"],
+    },
   },
 } as const
