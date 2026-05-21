@@ -12,17 +12,21 @@ export type ExpenseRow = {
   notes?: string | null;
   category?: string | null;
   recurring_type?: string;
+  chazy_percentage?: number | string;
+  helly_percentage?: number | string;
 };
 
 export function ExpenseTable({
   rows,
   monthColumnLabel = "Month",
+  showSplit = false,
   onTogglePaid,
   onEdit,
   onDelete,
 }: {
   rows: ExpenseRow[];
   monthColumnLabel?: string;
+  showSplit?: boolean;
   onTogglePaid: (r: ExpenseRow, paid: boolean) => void;
   onEdit: (r: ExpenseRow) => void;
   onDelete: (r: ExpenseRow) => void;
@@ -51,6 +55,8 @@ export function ExpenseTable({
             <th style={{ width: 40 }}></th>
             <th>Name</th>
             <th style={{ width: 140 }}>Price</th>
+            {showSplit && <th style={{ width: 150 }}>Chazy</th>}
+            {showSplit && <th style={{ width: 150 }}>Helly</th>}
             <th style={{ width: 130 }}>{monthColumnLabel}</th>
             <th style={{ width: 110 }}></th>
           </tr>
@@ -58,6 +64,9 @@ export function ExpenseTable({
         <tbody>
           {sorted.map((r) => {
             const m = r.expense_month ?? r.billing_month ?? "";
+            const amt = typeof r.amount === "string" ? parseFloat(r.amount) : r.amount;
+            const cz = parseFloat((r.chazy_percentage ?? 50) as any);
+            const he = parseFloat((r.helly_percentage ?? 50) as any);
             return (
               <tr key={r.id} className={r.is_paid ? "paid" : ""}>
                 <td>
@@ -76,7 +85,19 @@ export function ExpenseTable({
                     </div>
                   )}
                 </td>
-                <td className="amount-cell">{fmtMoney(r.amount)}</td>
+                <td className="amount-cell">{fmtMoney(amt)}</td>
+                {showSplit && (
+                  <td>
+                    <div className="amount-cell">{fmtMoney((amt * cz) / 100)}</div>
+                    <div className="small" style={{ color: "var(--text-dim)", fontSize: ".75rem" }}>{cz}%</div>
+                  </td>
+                )}
+                {showSplit && (
+                  <td>
+                    <div className="amount-cell">{fmtMoney((amt * he) / 100)}</div>
+                    <div className="small" style={{ color: "var(--text-dim)", fontSize: ".75rem" }}>{he}%</div>
+                  </td>
+                )}
                 <td style={{ color: "var(--text-muted)" }}>{m ? monthShort(m) + " " + m.slice(0, 4) : ""}</td>
                 <td>
                   <div className="row-actions">
