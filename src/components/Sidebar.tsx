@@ -98,7 +98,7 @@ export function Sidebar() {
               value={parseFloat(s.amount as any)}
               onSave={(n) => updateAmt(s.id, n)}
               className="amount editable"
-              prefix="$"
+              prefix="€"
             />
             <button
               onClick={() => removeSavings(s.id)}
