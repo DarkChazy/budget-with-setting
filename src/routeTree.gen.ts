@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PrivateRouteImport } from './routes/private'
 import { Route as HouseRouteImport } from './routes/house'
 import { Route as CreditCardRouteImport } from './routes/credit-card'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivateRoute = PrivateRouteImport.update({
   id: '/private',
   path: '/private',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/credit-card': typeof CreditCardRoute
   '/house': typeof HouseRoute
   '/private': typeof PrivateRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/credit-card': typeof CreditCardRoute
   '/house': typeof HouseRoute
   '/private': typeof PrivateRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/credit-card': typeof CreditCardRoute
   '/house': typeof HouseRoute
   '/private': typeof PrivateRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/credit-card' | '/house' | '/private'
+  fullPaths: '/' | '/credit-card' | '/house' | '/private' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/credit-card' | '/house' | '/private'
-  id: '__root__' | '/' | '/credit-card' | '/house' | '/private'
+  to: '/' | '/credit-card' | '/house' | '/private' | '/settings'
+  id: '__root__' | '/' | '/credit-card' | '/house' | '/private' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +76,18 @@ export interface RootRouteChildren {
   CreditCardRoute: typeof CreditCardRoute
   HouseRoute: typeof HouseRoute
   PrivateRoute: typeof PrivateRoute
+  SettingsRoute: typeof SettingsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/private': {
       id: '/private'
       path: '/private'
@@ -107,7 +124,18 @@ const rootRouteChildren: RootRouteChildren = {
   CreditCardRoute: CreditCardRoute,
   HouseRoute: HouseRoute,
   PrivateRoute: PrivateRoute,
+  SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
