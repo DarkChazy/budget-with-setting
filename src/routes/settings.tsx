@@ -97,13 +97,6 @@ function SavedPill({ visible }: { visible: boolean }) {
 }
 
 /* ============ Tab 1: General ============ */
-const MONTH_OFFSETS = [
-  { value: -1, label: "Previous month" },
-  { value: 0,  label: "Current month" },
-  { value: 1,  label: "Next month" },
-];
-
-function GeneralTab({ userId }: { userId: string }) {
 function GeneralTab({ userId: _userId }: { userId: string }) {
   return (
     <div className="row g-4">
