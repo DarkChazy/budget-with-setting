@@ -1,13 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { useCurrentUser } from "@/lib/auth";
 import {
   ensureUserSettings, ensureSeedCategories,
   notifySettingsChanged, notifyCategoriesChanged,
+  useCategories,
   type UserSettings,
 } from "@/lib/settings";
+import {
+  ensureTemplatesForCurrentMonth, notifyTemplatesChanged, notifySavingsChanged,
+} from "@/lib/templates";
+import { fmtMoney } from "@/lib/format";
 import { InlineNumber } from "@/components/InlineNumber";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Modal } from "@/components/Modal";
@@ -16,13 +21,14 @@ export const Route = createFileRoute("/settings")({
   component: () => <AppLayout><SettingsPage /></AppLayout>,
 });
 
-type TabKey = "general" | "house" | "categories" | "savings";
+type TabKey = "general" | "templates" | "house" | "categories" | "savings";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "general",    label: "General",          icon: "bi-sliders" },
-  { key: "house",      label: "House Defaults",   icon: "bi-house-gear" },
-  { key: "categories", label: "Categories",       icon: "bi-tag" },
-  { key: "savings",    label: "Savings Accounts", icon: "bi-piggy-bank" },
+  { key: "general",    label: "General",            icon: "bi-sliders" },
+  { key: "templates",  label: "Monthly Templates",  icon: "bi-arrow-repeat" },
+  { key: "house",      label: "House Defaults",     icon: "bi-house-gear" },
+  { key: "categories", label: "Categories",         icon: "bi-tag" },
+  { key: "savings",    label: "Savings Accounts",   icon: "bi-piggy-bank" },
 ];
 
 function SettingsPage() {
@@ -54,6 +60,7 @@ function SettingsPage() {
       </ul>
 
       {tab === "general"    && <GeneralTab    userId={user.id} />}
+      {tab === "templates"  && <TemplatesTab  userId={user.id} />}
       {tab === "house"      && <HouseTab      userId={user.id} />}
       {tab === "categories" && <CategoriesTab userId={user.id} />}
       {tab === "savings"    && <SavingsTab    userId={user.id} />}
