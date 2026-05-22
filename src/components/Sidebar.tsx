@@ -32,23 +32,31 @@ export function Sidebar() {
     setSavings((data ?? []) as any);
   };
   useEffect(() => { load(); }, [user?.id]);
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener("hb:savings-change", h);
+    return () => window.removeEventListener("hb:savings-change", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const addSavings = async () => {
     if (!user || !newName.trim()) return;
     await supabase.from("savings_accounts").insert({
       user_id: user.id, name: newName.trim(), amount: parseFloat(newAmt) || 0,
     });
-    setNewName(""); setNewAmt("0"); setAddOpen(false); load();
+    setNewName(""); setNewAmt("0"); setAddOpen(false);
+    window.dispatchEvent(new Event("hb:savings-change"));
   };
 
   const updateAmt = async (id: string, amt: number) => {
     await supabase.from("savings_accounts").update({ amount: amt }).eq("id", id);
     setSavings((s) => s.map((x) => x.id === id ? { ...x, amount: amt } : x));
+    window.dispatchEvent(new Event("hb:savings-change"));
   };
 
   const removeSavings = async (id: string) => {
     await supabase.from("savings_accounts").delete().eq("id", id);
-    load();
+    window.dispatchEvent(new Event("hb:savings-change"));
   };
 
   const logout = () => { setCurrentUser(null); navigate({ to: "/" }); };

@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Sidebar } from "./Sidebar";
 import { useCurrentUser } from "@/lib/auth";
 import { generateRecurringExpenses } from "@/lib/recurring";
+import { ensureTemplatesForCurrentMonth } from "@/lib/templates";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, ready } = useCurrentUser();
@@ -13,7 +14,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }, [ready, user, navigate]);
 
   useEffect(() => {
-    if (user) generateRecurringExpenses(user.id);
+    if (!user) return;
+    generateRecurringExpenses(user.id);
+    ensureTemplatesForCurrentMonth(user.id);
   }, [user?.id]);
 
   if (!ready || !user) return null;

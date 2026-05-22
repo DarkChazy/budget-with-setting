@@ -8,7 +8,8 @@ import { InlineNumber } from "@/components/InlineNumber";
 import { MonthSelector } from "@/components/MonthSelector";
 import { YearOverview, type MonthStat } from "@/components/YearOverview";
 import { MonthlyBarChart } from "@/components/MonthlyBarChart";
-import { useCategories, useUserSettings, defaultMonthFor } from "@/lib/settings";
+import { useCategories, useUserSettings } from "@/lib/settings";
+import { ensureTemplateExpensesForMonth } from "@/lib/templates";
 
 type AccountKind = "private" | "house";
 
@@ -27,10 +28,7 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
   const showCC = accountType === "private";
   const isHouse = accountType === "house";
 
-  const monthOffset = isHouse
-    ? (settings?.default_house_month_offset ?? 0)
-    : (settings?.default_private_month_offset ?? 0);
-  const newExpenseDefaultMonth = defaultMonthFor(monthOffset);
+  const newExpenseDefaultMonth = month;
   const defaultChazy = parseFloat((settings?.chazy_default_percentage ?? 60) as any);
   const defaultHelly = parseFloat((settings?.helly_default_percentage ?? 40) as any);
 
@@ -59,6 +57,21 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
 
   useEffect(() => { loadAccount(); }, [loadAccount]);
   useEffect(() => { loadExpenses(); }, [loadExpenses]);
+  // Materialize template-driven expenses for the visible month (current/future only)
+  useEffect(() => {
+    if (!user) return;
+    ensureTemplateExpensesForMonth(user.id, accountType, month).then(() => loadExpenses());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, accountType, month]);
+  // React to template edits made in Settings
+  useEffect(() => {
+    const h = () => {
+      if (!user) return;
+      ensureTemplateExpensesForMonth(user.id, accountType, month).then(() => loadExpenses());
+    };
+    window.addEventListener("hb:templates-change", h);
+    return () => window.removeEventListener("hb:templates-change", h);
+  }, [user?.id, accountType, month, loadExpenses]);
   useEffect(() => { setYear(parseInt(month.slice(0, 4))); }, [month]);
 
   const monthExpenses = useMemo(

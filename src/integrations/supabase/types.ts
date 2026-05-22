@@ -139,6 +139,7 @@ export type Database = {
           name: string
           notes: string | null
           recurring_type: Database["public"]["Enums"]["recurring_type"]
+          template_id: string | null
           updated_at: string
           user_id: string
         }
@@ -157,6 +158,7 @@ export type Database = {
           name: string
           notes?: string | null
           recurring_type?: Database["public"]["Enums"]["recurring_type"]
+          template_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -175,6 +177,7 @@ export type Database = {
           name?: string
           notes?: string | null
           recurring_type?: Database["public"]["Enums"]["recurring_type"]
+          template_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -194,6 +197,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      monthly_templates: {
+        Row: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          active: boolean
+          amount: number
+          category: string | null
+          chazy_percentage: number
+          created_at: string
+          default_paid: boolean
+          helly_percentage: number
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          active?: boolean
+          amount?: number
+          category?: string | null
+          chazy_percentage?: number
+          created_at?: string
+          default_paid?: boolean
+          helly_percentage?: number
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_type?: Database["public"]["Enums"]["account_type"]
+          active?: boolean
+          amount?: number
+          category?: string | null
+          chazy_percentage?: number
+          created_at?: string
+          default_paid?: boolean
+          helly_percentage?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       savings_accounts: {
         Row: {

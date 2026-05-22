@@ -1,13 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { useCurrentUser } from "@/lib/auth";
 import {
   ensureUserSettings, ensureSeedCategories,
   notifySettingsChanged, notifyCategoriesChanged,
+  useCategories,
   type UserSettings,
 } from "@/lib/settings";
+import {
+  ensureTemplatesForCurrentMonth, notifyTemplatesChanged, notifySavingsChanged,
+} from "@/lib/templates";
+import { fmtMoney } from "@/lib/format";
 import { InlineNumber } from "@/components/InlineNumber";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Modal } from "@/components/Modal";
@@ -16,13 +21,14 @@ export const Route = createFileRoute("/settings")({
   component: () => <AppLayout><SettingsPage /></AppLayout>,
 });
 
-type TabKey = "general" | "house" | "categories" | "savings";
+type TabKey = "general" | "templates" | "house" | "categories" | "savings";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "general",    label: "General",          icon: "bi-sliders" },
-  { key: "house",      label: "House Defaults",   icon: "bi-house-gear" },
-  { key: "categories", label: "Categories",       icon: "bi-tag" },
-  { key: "savings",    label: "Savings Accounts", icon: "bi-piggy-bank" },
+  { key: "general",    label: "General",            icon: "bi-sliders" },
+  { key: "templates",  label: "Monthly Templates",  icon: "bi-arrow-repeat" },
+  { key: "house",      label: "House Defaults",     icon: "bi-house-gear" },
+  { key: "categories", label: "Categories",         icon: "bi-tag" },
+  { key: "savings",    label: "Savings Accounts",   icon: "bi-piggy-bank" },
 ];
 
 function SettingsPage() {
@@ -54,6 +60,7 @@ function SettingsPage() {
       </ul>
 
       {tab === "general"    && <GeneralTab    userId={user.id} />}
+      {tab === "templates"  && <TemplatesTab  userId={user.id} />}
       {tab === "house"      && <HouseTab      userId={user.id} />}
       {tab === "categories" && <CategoriesTab userId={user.id} />}
       {tab === "savings"    && <SavingsTab    userId={user.id} />}
@@ -90,73 +97,394 @@ function SavedPill({ visible }: { visible: boolean }) {
 }
 
 /* ============ Tab 1: General ============ */
-const MONTH_OFFSETS = [
-  { value: -1, label: "Previous month" },
-  { value: 0,  label: "Current month" },
-  { value: 1,  label: "Next month" },
-];
-
-function GeneralTab({ userId }: { userId: string }) {
-  const [settings, setSettings] = useState<UserSettings | null>(null);
-  const { ping, visible } = useSavedPing();
-
-  useEffect(() => { ensureUserSettings(userId).then(setSettings); }, [userId]);
-
-  const update = async (patch: Partial<UserSettings>) => {
-    if (!settings) return;
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    await supabase.from("user_settings").update(patch).eq("user_id", userId);
-    notifySettingsChanged();
-    ping();
-  };
-
-  if (!settings) return null;
-
+function GeneralTab({ userId: _userId }: { userId: string }) {
   return (
     <div className="row g-4">
-      <div className="col-lg-6">
-        <div className="card-modern h-100">
-          <h2 className="h5 mb-1">Currency</h2>
-          <div className="subtitle mb-3">Used everywhere in the app</div>
-          <div className="d-flex align-items-center justify-content-between p-3 rounded"
+      <div className="col-lg-8">
+        <div className="card-modern">
+          <h2 className="h5 mb-1">General preferences</h2>
+          <div className="subtitle mb-3">Lightweight global settings</div>
+
+          <div className="d-flex align-items-center justify-content-between p-3 rounded mb-2"
                style={{ background: "var(--bg-elev)", border: "1px solid var(--border)" }}>
             <div>
-              <div className="fw-semibold" style={{ fontSize: "1.1rem" }}>€ Euro</div>
-              <div className="small" style={{ color: "var(--text-dim)" }}>European formatting · max 2 decimals</div>
+              <div className="fw-semibold">Theme</div>
+              <div className="small" style={{ color: "var(--text-dim)" }}>
+                Follows your system preference automatically
+              </div>
             </div>
-            <span className="badge text-bg-secondary"><i className="bi bi-lock-fill me-1" />Locked</span>
+            <span className="badge text-bg-secondary">
+              <i className="bi bi-circle-half me-1" />System
+            </span>
           </div>
-        </div>
-      </div>
 
-      <div className="col-lg-6">
-        <div className="card-modern h-100">
-          <div className="d-flex align-items-center justify-content-between mb-1">
-            <h2 className="h5 mb-0">Month defaults <SavedPill visible={visible} /></h2>
+          <div className="small" style={{ color: "var(--text-dim)" }}>
+            <i className="bi bi-info-circle me-1" />
+            Recurring monthly expenses are now managed in <strong>Monthly Templates</strong>.
           </div>
-          <div className="subtitle mb-3">Which month new expenses default to. Only affects future expenses.</div>
-
-          <label className="form-label small text-secondary">Default Personal Account Month</label>
-          <select
-            className="form-select mb-3"
-            value={settings.default_private_month_offset}
-            onChange={(e) => update({ default_private_month_offset: parseInt(e.target.value) })}
-          >
-            {MONTH_OFFSETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-
-          <label className="form-label small text-secondary">Default House Account Month</label>
-          <select
-            className="form-select"
-            value={settings.default_house_month_offset}
-            onChange={(e) => update({ default_house_month_offset: parseInt(e.target.value) })}
-          >
-            {MONTH_OFFSETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ============ Tab: Monthly Templates ============ */
+type Template = {
+  id: string;
+  user_id: string;
+  account_type: "private" | "house";
+  name: string;
+  amount: number | string;
+  category: string | null;
+  notes: string | null;
+  default_paid: boolean;
+  chazy_percentage: number | string;
+  helly_percentage: number | string;
+  active: boolean;
+};
+
+type TemplateDraft = {
+  id?: string;
+  name: string;
+  amount: number;
+  category: string;
+  notes: string;
+  default_paid: boolean;
+  chazy_percentage: number;
+  helly_percentage: number;
+};
+
+function TemplatesTab({ userId }: { userId: string }) {
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const { categories } = useCategories(userId);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalAccount, setModalAccount] = useState<"private" | "house">("private");
+  const [editing, setEditing] = useState<TemplateDraft | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<Template | null>(null);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("monthly_templates").select("*").eq("user_id", userId).order("created_at");
+    setTemplates((data ?? []) as any);
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openAdd = (account: "private" | "house") => {
+    setModalAccount(account);
+    setEditing(undefined);
+    setModalOpen(true);
+  };
+
+  const openEdit = (t: Template) => {
+    setModalAccount(t.account_type);
+    setEditing({
+      id: t.id,
+      name: t.name,
+      amount: parseFloat(t.amount as any),
+      category: t.category ?? "",
+      notes: t.notes ?? "",
+      default_paid: t.default_paid,
+      chazy_percentage: parseFloat(t.chazy_percentage as any),
+      helly_percentage: parseFloat(t.helly_percentage as any),
+    });
+    setModalOpen(true);
+  };
+
+  const save = async (draft: TemplateDraft) => {
+    const payload: any = {
+      name: draft.name.trim(),
+      amount: draft.amount,
+      category: draft.category || null,
+      notes: draft.notes || null,
+      default_paid: draft.default_paid,
+      chazy_percentage: draft.chazy_percentage,
+      helly_percentage: draft.helly_percentage,
+    };
+    if (draft.id) {
+      await supabase.from("monthly_templates").update(payload).eq("id", draft.id);
+    } else {
+      await supabase.from("monthly_templates").insert({
+        ...payload, user_id: userId, account_type: modalAccount, active: true,
+      });
+    }
+    setModalOpen(false);
+    await load();
+    // Materialize current-month expense from any newly added template
+    await ensureTemplatesForCurrentMonth(userId);
+    notifyTemplatesChanged();
+  };
+
+  const remove = async (t: Template) => {
+    await supabase.from("monthly_templates").delete().eq("id", t.id);
+    setPendingDelete(null);
+    await load();
+    notifyTemplatesChanged();
+  };
+
+  const privateT = useMemo(() => templates.filter((t) => t.account_type === "private"), [templates]);
+  const houseT   = useMemo(() => templates.filter((t) => t.account_type === "house"),   [templates]);
+
+  return (
+    <>
+      <div className="card-modern mb-3">
+        <div className="small" style={{ color: "var(--text-dim)" }}>
+          <i className="bi bi-info-circle me-1" />
+          Templates auto-generate an unpaid expense for the current and each new future month.
+          Editing a template only affects <strong>future</strong> generated months — history is never changed.
+        </div>
+      </div>
+
+      <TemplateSection
+        title="Personal Account"
+        icon="bi-person"
+        accountType="private"
+        templates={privateT}
+        categories={categories.map((c) => c.name)}
+        onAdd={() => openAdd("private")}
+        onEdit={openEdit}
+        onDelete={(t) => setPendingDelete(t)}
+      />
+      <div className="mt-4" />
+      <TemplateSection
+        title="House Account"
+        icon="bi-house"
+        accountType="house"
+        templates={houseT}
+        categories={categories.map((c) => c.name)}
+        onAdd={() => openAdd("house")}
+        onEdit={openEdit}
+        onDelete={(t) => setPendingDelete(t)}
+      />
+
+      <TemplateModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={save}
+        initial={editing}
+        showSplit={modalAccount === "house"}
+        categories={categories.map((c) => c.name)}
+      />
+
+      <ConfirmModal
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => pendingDelete && remove(pendingDelete)}
+        title="Delete template"
+        message={`Delete "${pendingDelete?.name}"? Historical expenses already created from this template will remain unchanged.`}
+      />
+    </>
+  );
+}
+
+function TemplateSection({
+  title, icon, accountType, templates, onAdd, onEdit, onDelete,
+}: {
+  title: string; icon: string;
+  accountType: "private" | "house";
+  templates: Template[];
+  categories: string[];
+  onAdd: () => void;
+  onEdit: (t: Template) => void;
+  onDelete: (t: Template) => void;
+}) {
+  const isHouse = accountType === "house";
+  const total = templates.reduce((s, t) => s + parseFloat(t.amount as any), 0);
+
+  return (
+    <div className="card-modern">
+      <div className="section-header">
+        <div>
+          <h2 className="h5 mb-0"><i className={"bi " + icon + " me-2"} />{title}</h2>
+          <div className="subtitle">
+            {templates.length} template{templates.length === 1 ? "" : "s"} · monthly total {fmtMoney(total)}
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={onAdd}>
+          <i className="bi bi-plus-lg me-1" />Add template
+        </button>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="text-center p-4" style={{ color: "var(--text-dim)" }}>
+          No templates yet — add one to auto-create it every month.
+        </div>
+      ) : (
+        <div className="table-responsive">
+          <table className="table align-middle mb-0">
+            <thead>
+              <tr style={{ color: "var(--text-dim)", fontSize: ".8rem", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                <th>Name</th>
+                <th>Category</th>
+                <th className="text-end">Amount</th>
+                {isHouse && <th className="text-end">Split</th>}
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {templates.map((t) => (
+                <tr key={t.id}>
+                  <td>
+                    <div className="fw-semibold">{t.name}</div>
+                    {t.notes && <div className="small" style={{ color: "var(--text-dim)" }}>{t.notes}</div>}
+                  </td>
+                  <td><span className="badge text-bg-secondary">{t.category ?? "—"}</span></td>
+                  <td className="text-end fw-semibold">{fmtMoney(parseFloat(t.amount as any))}</td>
+                  {isHouse && (
+                    <td className="text-end small" style={{ color: "var(--text-dim)" }}>
+                      C {parseFloat(t.chazy_percentage as any)}% · H {parseFloat(t.helly_percentage as any)}%
+                    </td>
+                  )}
+                  <td className="text-end">
+                    <button className="btn btn-sm btn-ghost" onClick={() => onEdit(t)} title="Edit">
+                      <i className="bi bi-pencil" />
+                    </button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => onDelete(t)} title="Delete">
+                      <i className="bi bi-trash" style={{ color: "var(--danger)" }} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TemplateModal({
+  open, onClose, onSave, initial, showSplit, categories,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (d: TemplateDraft) => void;
+  initial?: TemplateDraft;
+  showSplit: boolean;
+  categories: string[];
+}) {
+  const catList = categories.length > 0 ? categories : ["General"];
+  const [form, setForm] = useState<TemplateDraft>({
+    name: "", amount: 0, category: catList[0], notes: "",
+    default_paid: false, chazy_percentage: 50, helly_percentage: 50,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      id: initial?.id,
+      name: initial?.name ?? "",
+      amount: initial?.amount ?? 0,
+      category: initial?.category || catList[0],
+      notes: initial?.notes ?? "",
+      default_paid: initial?.default_paid ?? false,
+      chazy_percentage: initial?.chazy_percentage ?? 50,
+      helly_percentage: initial?.helly_percentage ?? 50,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial]);
+
+  const cz = form.chazy_percentage;
+  const he = form.helly_percentage;
+  const total = Math.round((cz + he) * 100) / 100;
+  const splitInvalid = showSplit && total !== 100;
+  const canSave = !!form.name.trim() && !splitInvalid;
+
+  const setCz = (n: number) => {
+    const v = isNaN(n) ? 0 : n;
+    setForm({ ...form, chazy_percentage: v, helly_percentage: Math.max(0, Math.round((100 - v) * 100) / 100) });
+  };
+  const setHe = (n: number) => {
+    const v = isNaN(n) ? 0 : n;
+    setForm({ ...form, helly_percentage: v, chazy_percentage: Math.max(0, Math.round((100 - v) * 100) / 100) });
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={initial?.id ? "Edit template" : "Add monthly template"}>
+      <form onSubmit={(e) => { e.preventDefault(); if (canSave) onSave(form); }}>
+        <div className="mb-3">
+          <label className="form-label small text-secondary">Name</label>
+          <input autoFocus className="form-control" value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Netflix" />
+        </div>
+        <div className="row g-3">
+          <div className="col-6">
+            <label className="form-label small text-secondary">Monthly amount</label>
+            <input type="number" step="0.01" className="form-control" value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div className="col-6">
+            <label className="form-label small text-secondary">Category</label>
+            <select className="form-select" value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              {(catList.includes(form.category) ? catList : [form.category, ...catList]).map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {showSplit && (
+          <div className="mt-3 p-3 rounded"
+               style={{ background: "var(--bg-elev)", border: "1px solid var(--border)" }}>
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <label className="form-label small text-secondary mb-0">Split between Chazy &amp; Helly</label>
+              <span className={"small fw-semibold " + (splitInvalid ? "text-danger" : "text-success")}>
+                Total: {total}%
+              </span>
+            </div>
+            <div className="row g-3">
+              <div className="col-6">
+                <label className="form-label small text-secondary">Chazy %</label>
+                <div className="input-group">
+                  <input type="number" step="0.01" min="0" max="100"
+                    className={"form-control" + (splitInvalid ? " is-invalid" : "")}
+                    value={cz} onChange={(e) => setCz(parseFloat(e.target.value))} />
+                  <span className="input-group-text">%</span>
+                </div>
+              </div>
+              <div className="col-6">
+                <label className="form-label small text-secondary">Helly %</label>
+                <div className="input-group">
+                  <input type="number" step="0.01" min="0" max="100"
+                    className={"form-control" + (splitInvalid ? " is-invalid" : "")}
+                    value={he} onChange={(e) => setHe(parseFloat(e.target.value))} />
+                  <span className="input-group-text">%</span>
+                </div>
+              </div>
+            </div>
+            {splitInvalid && (
+              <div className="text-danger small mt-2">
+                <i className="bi bi-exclamation-circle me-1" />
+                The combined percentage must equal 100%.
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3">
+          <label className="form-label small text-secondary">Notes</label>
+          <textarea className="form-control" rows={2} value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </div>
+
+        <div className="form-check mt-3">
+          <input className="form-check-input" type="checkbox" id="defaultPaid"
+            checked={form.default_paid}
+            onChange={(e) => setForm({ ...form, default_paid: e.target.checked })} />
+          <label className="form-check-label" htmlFor="defaultPaid">
+            Mark generated expenses as already paid
+          </label>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={!canSave}>
+            <i className="bi bi-check-lg me-1" />Save template
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -414,11 +742,13 @@ function SavingsTab({ userId }: { userId: string }) {
     });
     setNewName(""); setNewAmt("0"); setAddOpen(false);
     load();
+    notifySavingsChanged();
   };
 
   const updateAmount = async (id: string, amount: number) => {
     setItems((xs) => xs.map((x) => x.id === id ? { ...x, amount } : x));
     await supabase.from("savings_accounts").update({ amount }).eq("id", id);
+    notifySavingsChanged();
   };
 
   const saveName = async () => {
@@ -427,12 +757,14 @@ function SavingsTab({ userId }: { userId: string }) {
     await supabase.from("savings_accounts").update({ name }).eq("id", editingId);
     setEditingId(null);
     load();
+    notifySavingsChanged();
   };
 
   const remove = async (s: Savings) => {
     await supabase.from("savings_accounts").delete().eq("id", s.id);
     setPendingDelete(null);
     load();
+    notifySavingsChanged();
   };
 
   return (
