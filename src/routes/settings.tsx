@@ -742,11 +742,13 @@ function SavingsTab({ userId }: { userId: string }) {
     });
     setNewName(""); setNewAmt("0"); setAddOpen(false);
     load();
+    notifySavingsChanged();
   };
 
   const updateAmount = async (id: string, amount: number) => {
     setItems((xs) => xs.map((x) => x.id === id ? { ...x, amount } : x));
     await supabase.from("savings_accounts").update({ amount }).eq("id", id);
+    notifySavingsChanged();
   };
 
   const saveName = async () => {
@@ -755,12 +757,14 @@ function SavingsTab({ userId }: { userId: string }) {
     await supabase.from("savings_accounts").update({ name }).eq("id", editingId);
     setEditingId(null);
     load();
+    notifySavingsChanged();
   };
 
   const remove = async (s: Savings) => {
     await supabase.from("savings_accounts").delete().eq("id", s.id);
     setPendingDelete(null);
     load();
+    notifySavingsChanged();
   };
 
   return (
