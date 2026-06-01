@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { addMonths, currentMonth } from "./format";
+import { getUserSettings, listCategories } from "./api.functions";
 
 export type UserSettings = {
   user_id: string;
@@ -22,22 +22,20 @@ const DEFAULT_CATEGORIES = [
   "Internet", "Furniture", "Repairs", "Fun", "Subscriptions",
 ];
 
-export async function ensureUserSettings(userId: string): Promise<UserSettings> {
-  const { data } = await supabase
-    .from("user_settings").select("*").eq("user_id", userId).maybeSingle();
-  if (data) return data as any;
-  const row = { user_id: userId, ...DEFAULTS };
-  await supabase.from("user_settings").insert(row);
-  return row as any;
+export async function ensureUserSettings(_userId: string): Promise<UserSettings> {
+  const s = await getUserSettings();
+  return {
+    user_id: s.user_id,
+    default_private_month_offset: s.default_private_month_offset,
+    default_house_month_offset: s.default_house_month_offset,
+    chazy_default_percentage: parseFloat(s.chazy_default_percentage as any),
+    helly_default_percentage: parseFloat(s.helly_default_percentage as any),
+  };
 }
 
-export async function ensureSeedCategories(userId: string) {
-  const { data } = await supabase
-    .from("categories").select("id").eq("user_id", userId).limit(1);
-  if (data && data.length > 0) return;
-  await supabase.from("categories").insert(
-    DEFAULT_CATEGORIES.map((name) => ({ user_id: userId, name }))
-  );
+export async function ensureSeedCategories(_userId: string) {
+  // Server function lazily seeds on first listCategories call.
+  await listCategories();
 }
 
 export function useUserSettings(userId: string | undefined) {
@@ -65,10 +63,8 @@ export function useCategories(userId: string | undefined) {
 
   const reload = useCallback(async () => {
     if (!userId) return;
-    await ensureSeedCategories(userId);
-    const { data } = await supabase
-      .from("categories").select("id,name").eq("user_id", userId).order("name");
-    setCategories((data ?? []) as any);
+    const rows = await listCategories();
+    setCategories(rows as any);
   }, [userId]);
 
   useEffect(() => { reload(); }, [reload]);
