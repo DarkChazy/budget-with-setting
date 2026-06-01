@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PrivateRouteImport } from './routes/private'
 import { Route as HouseRouteImport } from './routes/house'
 import { Route as CreditCardRouteImport } from './routes/credit-card'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivateRoute = PrivateRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/credit-card': typeof CreditCardRoute
   '/house': typeof HouseRoute
   '/private': typeof PrivateRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/credit-card': typeof CreditCardRoute
   '/house': typeof HouseRoute
   '/private': typeof PrivateRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,28 @@ export interface FileRoutesById {
   '/credit-card': typeof CreditCardRoute
   '/house': typeof HouseRoute
   '/private': typeof PrivateRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/credit-card' | '/house' | '/private' | '/settings'
+  fullPaths:
+    | '/'
+    | '/credit-card'
+    | '/house'
+    | '/private'
+    | '/register'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/credit-card' | '/house' | '/private' | '/settings'
-  id: '__root__' | '/' | '/credit-card' | '/house' | '/private' | '/settings'
+  to: '/' | '/credit-card' | '/house' | '/private' | '/register' | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/credit-card'
+    | '/house'
+    | '/private'
+    | '/register'
+    | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +98,7 @@ export interface RootRouteChildren {
   CreditCardRoute: typeof CreditCardRoute
   HouseRoute: typeof HouseRoute
   PrivateRoute: typeof PrivateRoute
+  RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -86,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/private': {
@@ -124,8 +154,19 @@ const rootRouteChildren: RootRouteChildren = {
   CreditCardRoute: CreditCardRoute,
   HouseRoute: HouseRoute,
   PrivateRoute: PrivateRoute,
+  RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
