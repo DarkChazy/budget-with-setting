@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
-import { setCurrentUser, useCurrentUser } from "@/lib/auth";
-import { fmtMoney } from "@/lib/format";
+import { useCurrentUser, useInvalidateAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { InlineNumber } from "./InlineNumber";
+import { addSavings, deleteSavings, listSavings, updateSavingsAmount } from "@/lib/api.functions";
+import { logout as logoutFn } from "@/lib/auth.functions";
 
 type Savings = { id: string; name: string; amount: number | string };
 
@@ -17,6 +17,7 @@ const NAV = [
 
 export function Sidebar() {
   const { user } = useCurrentUser();
+  const invalidateAuth = useInvalidateAuth();
   const loc = useLocation();
   const navigate = useNavigate();
   const [savings, setSavings] = useState<Savings[]>([]);
@@ -26,10 +27,8 @@ export function Sidebar() {
 
   const load = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("savings_accounts")
-      .select("*").eq("user_id", user.id).order("created_at");
-    setSavings((data ?? []) as any);
+    const data = await listSavings();
+    setSavings(data as any);
   };
   useEffect(() => { load(); }, [user?.id]);
   useEffect(() => {
@@ -39,27 +38,29 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const addSavings = async () => {
+  const onAddSavings = async () => {
     if (!user || !newName.trim()) return;
-    await supabase.from("savings_accounts").insert({
-      user_id: user.id, name: newName.trim(), amount: parseFloat(newAmt) || 0,
-    });
+    await addSavings({ data: { name: newName.trim(), amount: parseFloat(newAmt) || 0 } });
     setNewName(""); setNewAmt("0"); setAddOpen(false);
     window.dispatchEvent(new Event("hb:savings-change"));
   };
 
   const updateAmt = async (id: string, amt: number) => {
-    await supabase.from("savings_accounts").update({ amount: amt }).eq("id", id);
+    await updateSavingsAmount({ data: { id, amount: amt } });
     setSavings((s) => s.map((x) => x.id === id ? { ...x, amount: amt } : x));
     window.dispatchEvent(new Event("hb:savings-change"));
   };
 
   const removeSavings = async (id: string) => {
-    await supabase.from("savings_accounts").delete().eq("id", id);
+    await deleteSavings({ data: { id } });
     window.dispatchEvent(new Event("hb:savings-change"));
   };
 
-  const logout = () => { setCurrentUser(null); navigate({ to: "/" }); };
+  const logout = async () => {
+    await logoutFn();
+    await invalidateAuth();
+    navigate({ to: "/" });
+  };
 
   return (
     <aside className="sidebar">
@@ -140,7 +141,7 @@ export function Sidebar() {
         </div>
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={() => setAddOpen(false)}>Cancel</button>
-          <button className="btn btn-primary" onClick={addSavings}>Add</button>
+          <button className="btn btn-primary" onClick={onAddSavings}>Add</button>
         </div>
       </Modal>
     </aside>
