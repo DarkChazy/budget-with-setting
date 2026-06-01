@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useCurrentUser, useInvalidateAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { InlineNumber } from "./InlineNumber";
-import { addSavings, deleteSavings, listSavings, logout as logoutFn, updateSavingsAmount } from "@/lib/api.functions";
+import { addSavings, deleteSavings, listSavings, updateSavingsAmount } from "@/lib/api.functions";
+import { logout as logoutFn } from "@/lib/auth.functions";
 
 type Savings = { id: string; name: string; amount: number | string };
 
