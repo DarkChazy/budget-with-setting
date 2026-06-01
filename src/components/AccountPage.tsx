@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/lib/auth";
+import {
+  deleteExpense as apiDeleteExpense,
+  getAccount,
+  listCC,
+  listExpenses,
+  setAccountAmount as apiSetAccountAmount,
+  setExpensePaid,
+  upsertExpense,
+} from "@/lib/api.functions";
 import { currentMonth, fmtMoney, monthLabel, yearMonths } from "@/lib/format";
 import { ExpenseModal, type ExpenseDraft } from "@/components/ExpenseModal";
 import { ExpenseTable, type ExpenseRow } from "@/components/ExpenseTable";
@@ -34,23 +42,16 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
 
   const loadAccount = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from("accounts")
-      .select("current_amount").eq("user_id", user.id).eq("account_type", accountType).maybeSingle();
+    const data = await getAccount({ data: { accountType } });
     setAccountAmount(parseFloat((data?.current_amount ?? 0) as any));
   }, [user?.id, accountType]);
 
   const loadExpenses = useCallback(async () => {
     if (!user) return;
-    const start = `${year}-01-01`;
-    const end = `${year}-12-01`;
-    const { data } = await supabase.from("expenses")
-      .select("*").eq("user_id", user.id).eq("account_type", accountType)
-      .is("deleted_at", null).gte("expense_month", start).lte("expense_month", end);
+    const data = await listExpenses({ data: { accountType, year } });
     setExpenses((data ?? []) as any);
     if (showCC) {
-      const { data: cc } = await supabase.from("credit_card_expenses")
-        .select("*").eq("user_id", user.id)
-        .is("deleted_at", null).gte("billing_month", start).lte("billing_month", end);
+      const cc = await listCC({ data: { year } });
       setCcExpenses((cc ?? []) as any);
     }
   }, [user?.id, accountType, year, showCC]);
@@ -119,37 +120,35 @@ export function AccountPage({ accountType, title }: { accountType: AccountKind; 
   const saveAmount = async (n: number) => {
     if (!user) return;
     setAccountAmount(n);
-    await supabase.from("accounts").update({ current_amount: n })
-      .eq("user_id", user.id).eq("account_type", accountType);
+    await apiSetAccountAmount({ data: { accountType, amount: n } });
   };
 
   const togglePaid = async (r: ExpenseRow, paid: boolean) => {
     setExpenses((xs) => xs.map((x) => x.id === r.id ? { ...x, is_paid: paid } : x));
-    await supabase.from("expenses").update({ is_paid: paid }).eq("id", r.id);
+    await setExpensePaid({ data: { id: r.id, paid } });
   };
 
   const deleteExpense = async (r: ExpenseRow) => {
     setExpenses((xs) => xs.filter((x) => x.id !== r.id));
-    await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", r.id);
+    await apiDeleteExpense({ data: { id: r.id } });
   };
 
   const saveExpense = async (e: ExpenseDraft) => {
     if (!user) return;
-    const payload: any = {
-      name: e.name, amount: e.amount, expense_month: e.expense_month,
-      notes: e.notes, category: e.category, recurring_type: e.recurring_type,
-    };
-    if (isHouse) {
-      payload.chazy_percentage = e.chazy_percentage ?? 50;
-      payload.helly_percentage = e.helly_percentage ?? 50;
-    }
-    if (e.id) {
-      await supabase.from("expenses").update(payload).eq("id", e.id);
-    } else {
-      await supabase.from("expenses").insert({
-        user_id: user.id, account_type: accountType, ...payload,
-      });
-    }
+    await upsertExpense({
+      data: {
+        id: e.id,
+        accountType,
+        name: e.name,
+        amount: e.amount,
+        expense_month: e.expense_month,
+        notes: e.notes,
+        category: e.category,
+        recurring_type: e.recurring_type,
+        chazy_percentage: isHouse ? (e.chazy_percentage ?? 50) : 50,
+        helly_percentage: isHouse ? (e.helly_percentage ?? 50) : 50,
+      },
+    });
     loadExpenses();
   };
 
