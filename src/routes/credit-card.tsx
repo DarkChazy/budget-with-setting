@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
+import {
+  deleteCC,
+  listCC,
+  setCCPaid,
+  upsertCC,
+} from "@/lib/api.functions";
 import { useCurrentUser } from "@/lib/auth";
 import { currentMonth, fmtMoney, monthLabel, yearMonths } from "@/lib/format";
 import { ExpenseModal, type ExpenseDraft } from "@/components/ExpenseModal";
@@ -23,11 +28,7 @@ function CCPage() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const start = `${year}-01-01`;
-    const end = `${year}-12-01`;
-    const { data } = await supabase.from("credit_card_expenses")
-      .select("*").eq("user_id", user.id).is("deleted_at", null)
-      .gte("billing_month", start).lte("billing_month", end);
+    const data = await listCC({ data: { year } });
     setRows((data ?? []).map((r: any) => ({ ...r, expense_month: undefined })) as any);
   }, [user?.id, year]);
 
@@ -39,25 +40,24 @@ function CCPage() {
 
   const togglePaid = async (r: ExpenseRow, paid: boolean) => {
     setRows((xs) => xs.map((x) => x.id === r.id ? { ...x, is_paid: paid } : x));
-    await supabase.from("credit_card_expenses").update({ is_paid: paid }).eq("id", r.id);
+    await setCCPaid({ data: { id: r.id, paid } });
   };
   const del = async (r: ExpenseRow) => {
     setRows((xs) => xs.filter((x) => x.id !== r.id));
-    await supabase.from("credit_card_expenses").update({ deleted_at: new Date().toISOString() }).eq("id", r.id);
+    await deleteCC({ data: { id: r.id } });
   };
   const save = async (e: ExpenseDraft) => {
     if (!user) return;
-    if (e.id) {
-      await supabase.from("credit_card_expenses").update({
-        name: e.name, amount: e.amount, billing_month: e.expense_month,
-        notes: e.notes, category: e.category,
-      }).eq("id", e.id);
-    } else {
-      await supabase.from("credit_card_expenses").insert({
-        user_id: user.id, name: e.name, amount: e.amount,
-        billing_month: e.expense_month, notes: e.notes, category: e.category,
-      });
-    }
+    await upsertCC({
+      data: {
+        id: e.id,
+        name: e.name,
+        amount: e.amount,
+        billing_month: e.expense_month,
+        notes: e.notes,
+        category: e.category,
+      },
+    });
     load();
   };
 
