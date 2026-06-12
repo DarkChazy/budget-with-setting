@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { useCurrentUser } from "@/lib/auth";
 import {
@@ -12,6 +11,12 @@ import {
 import {
   ensureTemplatesForCurrentMonth, notifyTemplatesChanged, notifySavingsChanged,
 } from "@/lib/templates";
+import {
+  listTemplates, upsertTemplate, deleteTemplate,
+  addCategory, renameCategory, deleteCategory,
+  listSavings, addSavings, updateSavingsAmount, renameSavings, deleteSavings,
+  setHouseDefaults, listCategories,
+} from "@/lib/api.functions";
 import { fmtMoney } from "@/lib/format";
 import { InlineNumber } from "@/components/InlineNumber";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -163,9 +168,8 @@ function TemplatesTab({ userId }: { userId: string }) {
   const [pendingDelete, setPendingDelete] = useState<Template | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("monthly_templates").select("*").eq("user_id", userId).order("created_at");
-    setTemplates((data ?? []) as any);
+    const data = await listTemplates();
+    setTemplates(data as any);
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
@@ -201,13 +205,17 @@ function TemplatesTab({ userId }: { userId: string }) {
       chazy_percentage: draft.chazy_percentage,
       helly_percentage: draft.helly_percentage,
     };
-    if (draft.id) {
-      await supabase.from("monthly_templates").update(payload).eq("id", draft.id);
-    } else {
-      await supabase.from("monthly_templates").insert({
-        ...payload, user_id: userId, account_type: modalAccount, active: true,
-      });
-    }
+    await upsertTemplate({ data: {
+      id: draft.id,
+      account_type: modalAccount,
+      name: payload.name,
+      amount: payload.amount,
+      category: payload.category,
+      notes: payload.notes,
+      default_paid: payload.default_paid,
+      chazy_percentage: payload.chazy_percentage,
+      helly_percentage: payload.helly_percentage,
+    } });
     setModalOpen(false);
     await load();
     // Materialize current-month expense from any newly added template
@@ -216,7 +224,7 @@ function TemplatesTab({ userId }: { userId: string }) {
   };
 
   const remove = async (t: Template) => {
-    await supabase.from("monthly_templates").delete().eq("id", t.id);
+    await deleteTemplate({ data: { id: t.id } });
     setPendingDelete(null);
     await load();
     notifyTemplatesChanged();
@@ -511,10 +519,7 @@ function HouseTab({ userId }: { userId: string }) {
     if (t !== 100) return;
     if (!settings) return;
     setSettings({ ...settings, chazy_default_percentage: nextCz, helly_default_percentage: nextHe });
-    await supabase.from("user_settings").update({
-      chazy_default_percentage: nextCz,
-      helly_default_percentage: nextHe,
-    }).eq("user_id", userId);
+    await setHouseDefaults({ data: { chazy: nextCz, helly: nextHe } });
     notifySettingsChanged();
     ping();
   }, [settings, userId]);
@@ -602,8 +607,7 @@ function CategoriesTab({ userId }: { userId: string }) {
 
   const load = useCallback(async () => {
     await ensureSeedCategories(userId);
-    const { data } = await supabase
-      .from("categories").select("id,name").eq("user_id", userId).order("name");
+    const data = await listCategories();
     setCats((data ?? []) as any);
   }, [userId]);
 
@@ -617,7 +621,7 @@ function CategoriesTab({ userId }: { userId: string }) {
       return;
     }
     setError("");
-    await supabase.from("categories").insert({ user_id: userId, name });
+    await addCategory({ data: { name } });
     setNewName("");
     notifyCategoriesChanged();
     load();
@@ -628,14 +632,14 @@ function CategoriesTab({ userId }: { userId: string }) {
   const saveEdit = async () => {
     const name = editingName.trim();
     if (!editingId || !name) { setEditingId(null); return; }
-    await supabase.from("categories").update({ name }).eq("id", editingId);
+    await renameCategory({ data: { id: editingId, name } });
     setEditingId(null);
     notifyCategoriesChanged();
     load();
   };
 
   const remove = async (c: Category) => {
-    await supabase.from("categories").delete().eq("id", c.id);
+    await deleteCategory({ data: { id: c.id } });
     setPendingDelete(null);
     notifyCategoriesChanged();
     load();
@@ -728,8 +732,7 @@ function SavingsTab({ userId }: { userId: string }) {
   const [pendingDelete, setPendingDelete] = useState<Savings | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("savings_accounts").select("*").eq("user_id", userId).order("created_at");
+    const data = await listSavings();
     setItems((data ?? []) as any);
   }, [userId]);
 
@@ -737,9 +740,7 @@ function SavingsTab({ userId }: { userId: string }) {
 
   const add = async () => {
     if (!newName.trim()) return;
-    await supabase.from("savings_accounts").insert({
-      user_id: userId, name: newName.trim(), amount: parseFloat(newAmt) || 0,
-    });
+    await addSavings({ data: { name: newName.trim(), amount: parseFloat(newAmt) || 0 } });
     setNewName(""); setNewAmt("0"); setAddOpen(false);
     load();
     notifySavingsChanged();
@@ -747,21 +748,21 @@ function SavingsTab({ userId }: { userId: string }) {
 
   const updateAmount = async (id: string, amount: number) => {
     setItems((xs) => xs.map((x) => x.id === id ? { ...x, amount } : x));
-    await supabase.from("savings_accounts").update({ amount }).eq("id", id);
+    await updateSavingsAmount({ data: { id, amount } });
     notifySavingsChanged();
   };
 
   const saveName = async () => {
     const name = editingName.trim();
     if (!editingId || !name) { setEditingId(null); return; }
-    await supabase.from("savings_accounts").update({ name }).eq("id", editingId);
+    await renameSavings({ data: { id: editingId, name } });
     setEditingId(null);
     load();
     notifySavingsChanged();
   };
 
   const remove = async (s: Savings) => {
-    await supabase.from("savings_accounts").delete().eq("id", s.id);
+    await deleteSavings({ data: { id: s.id } });
     setPendingDelete(null);
     load();
     notifySavingsChanged();
