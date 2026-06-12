@@ -1,8 +1,10 @@
-import { randomBytes, createHash } from "node:crypto";
+import { randomBytes, createHash, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { eq, lt } from "drizzle-orm";
 import { db, schema } from "@/db/client.server";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
-import { hash as argonHash, verify as argonVerify } from "@node-rs/argon2";
+
+const scrypt = promisify(_scrypt) as (pw: string, salt: Buffer, keylen: number) => Promise<Buffer>;
 
 export const SESSION_COOKIE = "hb_session";
 const SESSION_TTL_DAYS = 30;
@@ -77,9 +79,18 @@ export async function cleanExpiredSessions() {
 }
 
 export async function hashPassword(pw: string): Promise<string> {
-  return argonHash(pw);
+  const salt = randomBytes(16);
+  const key = await scrypt(pw, salt, 64);
+  return `scrypt$${salt.toString("hex")}$${key.toString("hex")}`;
 }
 
 export async function verifyPassword(hash: string, pw: string): Promise<boolean> {
-  try { return await argonVerify(hash, pw); } catch { return false; }
+  try {
+    const [scheme, saltHex, keyHex] = hash.split("$");
+    if (scheme !== "scrypt") return false;
+    const salt = Buffer.from(saltHex, "hex");
+    const expected = Buffer.from(keyHex, "hex");
+    const actual = await scrypt(pw, salt, expected.length);
+    return timingSafeEqual(actual, expected);
+  } catch { return false; }
 }
