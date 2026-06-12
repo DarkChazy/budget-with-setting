@@ -8,7 +8,6 @@ FROM oven/bun:1.3 AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Ensure nitro picks the node-server preset (config already sets this outside Lovable).
 ENV NITRO_PRESET=node-server
 RUN bun run build
 
